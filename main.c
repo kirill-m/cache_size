@@ -20,10 +20,11 @@
 struct Node {
     struct Node *next;
     char payload[PAYLOAD_SIZE];
-    //int visited;
 };
 
 void getCpuInfo(FILE* fp);
+void iterate(FILE* fp, short is_random);
+size_t getRandomNumber(size_t limit);
 
 int main() {
     printf("Processing...\n");
@@ -36,9 +37,16 @@ int main() {
     FILE *fp;
     fp=fopen("results.txt", "w");
     fprintf(fp, "%s", c_time_string);
-    fprintf(fp, "CACHE SIZE TEST\n");
+    fprintf(fp, "Cache size.\n");
     
     getCpuInfo(fp);
+    
+    fprintf(fp, "\nSequential iteration:\n");
+    iterate(fp, 0);
+    
+    fprintf(fp, "\nRandom iteration:\n");
+    iterate(fp, 1);
+    
     printf("See results in results.txt.\n");
     fclose(fp);
     
@@ -56,7 +64,7 @@ void getCpuInfo(FILE* fp) {
     return;
 #endif
     
-    fprintf(fp, "\nSystem info...\n");
+    fprintf(fp, "\nSystem info:\n");
     
     if (pp != NULL) {
         while (1) {
@@ -70,4 +78,68 @@ void getCpuInfo(FILE* fp) {
         pclose(pp);
     }
 }
+
+void iterate(FILE* fp, short is_random) {
+    
+    double iteration_time = 0;
+    
+    size_t node_size = sizeof(struct Node);
+    
+    size_t elements_min = BOTTOM_SIZE / node_size;
+    size_t elements_max = TOP_SIZE / node_size;
+    
+    for(size_t size = elements_min; size < elements_max; size *= 2) {
+        struct Node *buff = malloc(size * sizeof(struct Node));
+        
+        for(size_t i = 0; i < size - 1; i++) {
+            buff[i].next = &buff[i+1];
+        }
+        
+        if (is_random) {
+            for(size_t i = 0; i < size - 1; i++) {
+                struct Node temp;
+                size_t index = getRandomNumber(size - 2);
+                temp = buff[i];
+                buff[i] = buff[index];
+                buff[index] = temp;
+            }
+        }
+        
+        buff[size - 1].next = &buff[0];
+        
+        clock_t start, end;
+        
+        for (size_t j = 0; j < CYCLES_NUMBER; j++) {
+            start = clock();
+            struct Node *node = buff;
+            
+            for (size_t i = 0; i < STEPS; i++) {
+                node = node->next;
+            }
+            
+            end = clock();
+            iteration_time += (double)(end - start) / CLOCKS_PER_SEC;
+        }
+        
+        iteration_time /= CYCLES_NUMBER;
+        
+        free(buff);
+        
+        fprintf(fp, "%zd", node_size*size);
+        fprintf(fp, "\t%f\n", iteration_time);
+    }
+}
+
+
+size_t getRandomNumber(size_t limit) {
+    size_t divisor = RAND_MAX / (limit+1);
+    size_t random_number;
+    
+    do {
+        random_number = rand() / divisor;
+    } while (random_number > limit);
+    
+    return random_number;
+}
+
 
